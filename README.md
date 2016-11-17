@@ -6,81 +6,89 @@ Current implementation is not full support HOCON specification, follow link [LIM
 
 **Notation example:**
 
-    # Hocon notation example
-    
-    include "another.conf"
-    
-    top.level.property : 3
-    
-    rootNode {
-        subNode {
-            # strings
-            string_property : "test string value"
-            string_property : some-string
-            
-            #int
-            int_property : 333
-            
-            # decimal
-            decimal_property1 : 333.22
-            decimal_property2 : 1E5
-            
-            # bool
-            boolena_property1 : true
-            boolena_property2 : false
-            boolena_property3 : off
-            boolena_property4 : off
-            boolena_property5 : enabled
-            boolena_property6 : disabled
-        }
-    }
-    
-    derived : $(rootNode) {
-        # extend with new property
-        extra_property : 1
+# base.conf
+isbase true;
 
-        subNode {
-            # override properties
-            string_property : "new value"
-            int_property : ${top.level.property}
-        }
+
+#test.conf 
+
+include "base.conf"
+
+name    test
+
+port    8000
+
+ip:"127.0.0.1";
+
+ip2=127.0.0.1;
+
+ips [1,2,3,4]
+
+item
+{
+    subItem{
+        name subitem_v
     }
+}
+
+copyItem :${item} {
+    cName cname;
     
+    cPort 2000
+        
+    subItem{
+        name override;
+    }
+}
+
+
+copyItem2 :$(item) {
+    cName cname;
+    
+    cPort 2000
+        
+    subItem{
+        name override;
+    }
+}
+
+
+copyItem3 :$item {
+    cName cname;
+    
+    cPort 2000
+        
+    subItem{
+        name override;
+    }
+}
 ### How to use
 **Using HOCON notation:**    
 ```csharp
-var reader = new DictionaryReader(null);
-reader.ReadFromString(
-@"ssh {
-    connection {
-        host : 127.0.0.1
-        port : 22
-    }
-    status : on
-}");
+ var reader = new DictionaryReader(item =>
+{
+    var content = File.ReadAllText(item);
 
-var host = reader.Source["ssh.connection.host"];
-var port = reader.Source["ssh.connection.port"];
-var status = reader.Source["ssh.status"];
+    content = new Regex("\t+").Replace(content, " ");
+    content = new Regex("\r\n{").Replace(content, "{");
+    content = new Regex("( )*{( )*").Replace(content, "{");
+    content = new Regex("( )*=( )*").Replace(content, "=");
+    content = new Regex("( )*:( )*").Replace(content, ":");
+
+    return content;
+});
+
+reader.Read("test.conf");
+
+ MessageBox.Show(reader.Source["isbase"].ToString());
+
+foreach (var item in (List<object>)reader.Source["ips"])
+{
+    MessageBox.Show(item.ToString());
+}
+
+MessageBox.Show(reader.Source["item.subItem.name"].ToString());
 ```
     
-**Using configuration library:**    
-```csharp
-var config = new Configuration(null);
-config.ReadFromString(
-@"ssh {
-    connection {
-        host : 127.0.0.1
-        port : 22
-    }
-    status : on
-    log : ["warn", error, info]
-}");
-
-var host = config.GetString("ssh.connection.host");
-var port = config.GetInt("ssh.connection.port");
-var status = config.GetBool("ssh.status");
-var log = config.GetStringList("ssh.log");
-```
     
     

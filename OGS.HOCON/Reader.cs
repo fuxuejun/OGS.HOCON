@@ -132,7 +132,7 @@ namespace OGS.HOCON
                 // Read assign or scope
                 if (tokenizer.ReadNext(out token, out value,
                     new[] { TokenType.BeginScope, TokenType.Assign },
-                    new[] { TokenType.Comment, TokenType.Space }) == false)
+                    new[] { TokenType.Comment }) == false)
                     throw new ReaderException("Expected assign or begin scope, but: {0}, offset: {1}", token, tokenizer.Offset);
 
                 tokenizer.Consume();
@@ -142,14 +142,14 @@ namespace OGS.HOCON
                     if (tokenizer.ReadNext(out token, out value,
                         new[]
                             {
+                                TokenType.BeginArray,
                                 TokenType.StringValue, 
                                 TokenType.NumericValue, 
                                 TokenType.DeciamlValue, 
                                 TokenType.DoubleValue,
                                 TokenType.BooleanValue, 
                                 TokenType.Substitution,
-                                TokenType.SafeSubstitution,
-                                TokenType.BeginArray
+                                TokenType.SafeSubstitution
                             },
                         new[] { TokenType.Comment, TokenType.Space }) == false)
                         throw new ReaderException("Expected arra/string/numeric/bool/substitution, but: {0}, offset: {1}", token, tokenizer.Offset);
