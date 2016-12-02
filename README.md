@@ -1,3 +1,4 @@
+
 OGS.HOCON
 =========
 OGS.HOCON dotNet library based on the same HOCON notation described in [typesafe HCOCN](https://github.com/typesafehub/config/blob/master/HOCON.md).
@@ -33,9 +34,9 @@ item
 
 copyItem :${item} {
     cName cname;
-    
+
     cPort 2000
-        
+
     subItem{
         name override;
     }
@@ -44,9 +45,9 @@ copyItem :${item} {
 
 copyItem2 :$(item) {
     cName cname;
-    
+
     cPort 2000
-        
+
     subItem{
         name override;
     }
@@ -55,13 +56,33 @@ copyItem2 :$(item) {
 
 copyItem3 :$item {
     cName cname;
-    
+
     cPort 2000
-        
+
     subItem{
         name override;
     }
 }
+
+item1
+{
+
+	path "11"
+}
+
+item2
+{
+	path "22"
+}
+
+item3
+{
+	path "33"
+	param "aa"
+}
+
+watch [	$item1, $item2, $item3 ]
+
 ### How to use
 **Using HOCON notation:**    
 ```csharp
@@ -88,7 +109,14 @@ foreach (var item in (List<object>)reader.Source["ips"])
 }
 
 MessageBox.Show(reader.Source["item.subItem.name"].ToString());
+
+var objs = ConfigUtils.Read<List<dynamic>>("watch");
+
+foreach (dynamic o in objs)
+{
+MessageBox.Show(o.path.ToString());
+}
 ```
-    
-    
-    
+
+
+​    
