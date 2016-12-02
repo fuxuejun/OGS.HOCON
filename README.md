@@ -8,11 +8,12 @@ Current implementation is not full support HOCON specification, follow link [LIM
 **Notation example:**
 
 # base.conf
+``` javascript
 isbase true;
-
+```
 
 #test.conf 
-
+``` javascript
 include "base.conf"
 
 name    test
@@ -27,19 +28,19 @@ ips [1,2,3,4]
 
 item
 {
-    subItem{
-        name subitem_v
-    }
+	subItem {
+	    name subitem_v
+	}
 }
 
 copyItem :${item} {
-    cName cname;
+	cName cname;
 
-    cPort 2000
+	cPort 2000
 
-    subItem{
-        name override;
-    }
+	subItem{
+	    name override;
+	}
 }
 
 
@@ -82,7 +83,7 @@ item3
 }
 
 watch [	$item1, $item2, $item3 ]
-
+```
 ### How to use
 **Using HOCON notation:**    
 ```csharp
