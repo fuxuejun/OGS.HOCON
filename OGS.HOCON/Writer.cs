@@ -6,6 +6,63 @@ using System.Collections.Generic;
 
 namespace OGS.HOCON
 {
+    public class TreeNode
+    {
+        public TreeNode()
+        {
+            Nodes = new List<TreeNode>();
+        }
+
+        public TreeNode(string name)
+            : this()
+        {
+            this.Name = name;
+        }
+
+        public TreeNode(string name, object val)
+            : this(name)
+        {
+            this.Value = val;
+        }
+
+        public int Depth { get; set; }
+        public string Key { get; set; }
+        public string Name { get; set; }
+        public object Value { get; set; }
+        public bool ViturlNode { get; set; }
+        public TreeNode RootNode { get; set; }
+        public List<TreeNode> Nodes { get; set; }
+
+        private TreeNode FindNodeByName(string name, List<TreeNode> nodes)
+        {
+            foreach (var treeNode in nodes)
+            {
+                if (treeNode.Name == name)
+                {
+                    return treeNode;
+                }
+
+                var node = FindNodeByName(name, treeNode.Nodes);
+                if (node != null)
+                {
+                    return node;
+                }
+            }
+
+            return null;
+        }
+
+        public TreeNode FindNode(string name)
+        {
+            return FindNodeByName(name, Nodes);
+        }
+
+        public bool Contains(string key)
+        {
+            return FindNodeByName(key, Nodes) != null;
+        }
+    }
+
     public class Writer<TNode>
         where TNode : class, new()
     {
@@ -16,119 +73,124 @@ namespace OGS.HOCON
             writter.Flush();
         }
 
-        public string WriteString(IEnumerable<KeyValuePair<string, object>> data, string headline = null)
+        private TreeNode BuildTree(IEnumerable<KeyValuePair<string, object>> data)
         {
-            var builder = new StringBuilder();
-
-            if (string.IsNullOrEmpty(headline) == false)
+            var tree = new TreeNode();
+            tree.ViturlNode = true;
+            tree.Depth = 0;
+            foreach (var entry in data)
             {
-                foreach (var line in headline.Split(new[]{'\n', '\r'}, StringSplitOptions.RemoveEmptyEntries))
+                var keyArray = entry.Key.Split('.');
+                var prevKey = string.Empty;
+                TreeNode parentNode = null;
+                foreach (var key in keyArray)
                 {
-                    builder.Append("# ");
-                    builder.AppendLine(line);
-                }
-            }
-
-            var blocks = new Stack<string>();
-
-            foreach (var entry in data.OrderBy(item => item.Key))
-            {
-                if (entry.Value is TNode)
-                {
-                    if (blocks.Count == 0)
+                    if (!string.IsNullOrEmpty(prevKey))
                     {
-                        builder.AppendLine();
-                        builder.AppendFormat("{0} {{", entry.Key);
-                        builder.AppendLine();
-
-                        blocks.Push(entry.Key);
+                        parentNode = parentNode?.FindNode(prevKey);
                     }
-                    else if (entry.Key.StartsWith(blocks.Peek() + "."))
-                    {
-                        builder.AppendLine();
-                        builder.AppendFormat("{0}{1} {{", 
-                            new string('\t', blocks.Count),
-                            entry.Key.Replace(blocks.Peek() + ".", string.Empty));
-                        builder.AppendLine();
 
-                        blocks.Push(entry.Key);
+                    if (parentNode == null)
+                    {
+                        parentNode = tree;
+                    }
+                    if (entry.Value is DictionaryReaderNode)
+                    {
+                        if (!parentNode.Contains(key))
+                        {
+                            var node = new TreeNode(key);
+                            node.Depth = parentNode.Depth + 1;
+                            parentNode.Nodes.Add(node);
+                        }
                     }
                     else
                     {
-                        while (blocks.Count > 0)
+                        if (!parentNode.Contains(key))
                         {
-                            blocks.Pop();
-
-                            builder.AppendFormat("{0}}}", new string('\t', blocks.Count));
-                            builder.AppendLine();
+                            var node = new TreeNode(key, entry.Value);
+                            node.Depth = parentNode.Depth + 1;
+                            parentNode.Nodes.Add(node);
                         }
-
-                        blocks.Push(entry.Key);
-
-                        builder.AppendLine();
-                        builder.AppendFormat("{0} {{", entry.Key);
-                        builder.AppendLine();
                     }
+
+                    prevKey = key;
+                }
+            }
+
+            return tree;
+        }
+
+        public string WriteString(IEnumerable<KeyValuePair<string, object>> data, string headline = null)
+        {
+            var tree = BuildTree(data);
+
+            var buffer = new StringBuilder();
+            buffer.AppendLine("#" + headline);
+            WriteNode(tree.Nodes, buffer);
+
+            return buffer.ToString();
+        }
+
+
+
+        private void WriteNode(List<TreeNode> nodes, StringBuilder buffer)
+        {
+            foreach (var treeNode in nodes)
+            {
+                if (treeNode.ViturlNode) continue;
+
+                if (treeNode.Nodes.Count > 0)
+                {
+                    buffer.AppendLine(new string('\t', (treeNode.Depth - 1)) + treeNode.Name + " {");
+                    WriteNode(treeNode.Nodes, buffer);
+                    buffer.AppendLine(new string('\t', (treeNode.Depth - 1)) + "}");
                 }
                 else
                 {
-                    if (blocks.Count == 0 || entry.Key.StartsWith(blocks.Peek() + ".") == false)
+                    if (treeNode.Value.GetType().IsGenericType)
                     {
-                        while (blocks.Count > 0)
+                        var array = treeNode.Value as List<object>;
+                        if (array == null) continue;
+                        buffer.AppendLine(new string('\t', (treeNode.Depth - 1)) + treeNode.Name + " [");
+                        for (var index = 0; index < array.Count; index++)
                         {
-                            blocks.Pop();
-                            builder.Append(new string('\t', blocks.Count));
-                            builder.AppendLine("}");
+                            var item = array[index];
+                            if (index == array.Count - 1)
+                            {
+                                buffer.AppendLine(new string('\t', (treeNode.Depth)) + WriteValue(item));
+                            }
+                            else
+                            {
+                                buffer.AppendLine(new string('\t', (treeNode.Depth)) + WriteValue(item) + ",");
+                            }
                         }
-                        builder.AppendLine();
+                        buffer.AppendLine(new string('\t', (treeNode.Depth - 1)) + "]");
                     }
-
-                    builder.Append(new string('\t', blocks.Count));
-
-                    builder.AppendFormat("{0} : ",
-                        (blocks.Count) > 0 ? entry.Key.Replace(blocks.Peek() + ".", string.Empty) : entry.Key);
-
-                    WriteValue(builder, entry.Value);
-
-                    builder.AppendLine();
+                    else
+                    {
+                        buffer.AppendLine(new string('\t', (treeNode.Depth - 1)) + treeNode.Name + " " + WriteValue(treeNode.Value));
+                    }
                 }
             }
-
-            while (blocks.Count > 0)
-            {
-                blocks.Pop();
-                builder.Append(new string('\t', blocks.Count));
-                builder.AppendLine("}");
-            }
-
-            return builder.ToString();
         }
 
-        private void WriteValue(StringBuilder builder, object value)
+        private string WriteValue(object val)
         {
-            var array = value as List<object>;
-            if (array != null)
+            string item;
+            if (val is string)
             {
-                builder.Append("[");
-                
-                var count = array.Count;
-                foreach (var item in array)
-                {
-                    WriteValue(builder, item);
-                    if (--count > 0) builder.Append(", ");
-                }
-                builder.Append("]");
+                item = "\"" + val + "\"";
             }
-            else if (value is string)
+            else if (val is bool)
             {
-                builder.AppendFormat("\"{0}\"", value);
-            }
-            else if (value is bool)
-            {
-                builder.Append(((bool)value) ? "true" : "false");
+                item = ((bool)val) ? "true" : "false";
             }
             else
-                builder.AppendFormat("{0}", value);
+            {
+                item = val.ToString();
+            }
+
+            return item;
         }
     }
 }
